@@ -8,6 +8,7 @@ use PeterVanDerWal\AdventOfCode\Cli\Attribute\TestWithDemoInput;
 use PeterVanDerWal\AdventOfCode\Cli\Exception\PuzzleInputNotFoundException;
 use PeterVanDerWal\AdventOfCode\Cli\Model\PuzzleImplementation;
 use PeterVanDerWal\AdventOfCode\Cli\Repository\PuzzleRepository;
+use PeterVanDerWal\AdventOfCode\Cli\Service\AnswerService;
 use PeterVanDerWal\AdventOfCode\Cli\Service\PuzzleInputService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -36,6 +37,7 @@ class RunCommand extends Command
         private readonly bool $autoSubmit,
         private readonly PuzzleRepository $puzzleRepository,
         private readonly PuzzleInputService $puzzleInputService,
+        private readonly AnswerService $answerService,
     ) {
         parent::__construct();
     }
@@ -83,7 +85,7 @@ class RunCommand extends Command
 
         $success = true;
         foreach ($puzzles as $puzzle) {
-            $success = $this->runPuzzle($puzzle, $io) || $success;
+            $success = $this->runPuzzle($puzzle, $input, $io) || $success;
         }
 
         return $success ? self::SUCCESS : self::FAILURE;
@@ -125,7 +127,7 @@ class RunCommand extends Command
         );
     }
 
-    private function runPuzzle(PuzzleImplementation $puzzle, SymfonyStyle $io): bool
+    private function runPuzzle(PuzzleImplementation $puzzle, InputInterface $input, SymfonyStyle $io): bool
     {
         $io->title($puzzle->getName());
 
@@ -135,7 +137,7 @@ class RunCommand extends Command
             }
         }
 
-        return $this->runFullPuzzle($puzzle, $io);
+        return $this->runFullPuzzle($puzzle, $input, $io);
     }
 
     private function runPuzzleWithDemoInput(
@@ -163,12 +165,13 @@ class RunCommand extends Command
 
     private function runFullPuzzle(
         PuzzleImplementation $puzzle,
+        InputInterface $input,
         SymfonyStyle $io,
     ): bool {
         $io->section(sprintf('Running full puzzle'));
 
         try {
-            $input = $this->puzzleInputService->getPuzzleInput($puzzle->year, $puzzle->day);
+            $puzzleInput = $this->puzzleInputService->getPuzzleInput($puzzle->year, $puzzle->day);
         } catch (PuzzleInputNotFoundException $exception) {
             $io->error(sprintf(
                 'Puzzle input not found, please store it as "%s" manually or configure your Advent of Code session id as described in %s',
@@ -178,11 +181,54 @@ class RunCommand extends Command
             return false;
         }
 
-        $answer = $puzzle->run($input);
+        $answer = $puzzle->run($puzzleInput);
         $io->block('Found answer: ' . $answer, style: 'bg=cyan', padding: true);
+        $isCorrectAnswer = $this->answerService->isCorrectAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
 
-        // TODO submit answer to AoC
-        return true;
+        if ($isCorrectAnswer) {
+            $io->success('Found the correct answer that was submitted already');
+            return true;
+        }
+
+        if ($isCorrectAnswer === false) {
+            $io->error('Found the answer that was previously marked as incorrect');
+            return false;
+        }
+
+        if ($this->shouldSubmit($input, $io)) {
+            $submitResult = $this->answerService->submitAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+            $io->{$submitResult->correctAnswer ? 'success' : 'error'}(
+                "Advent of Code said:\n\n".
+                $submitResult->adventOfCodeResponse
+            );
+            if ($submitResult->correctAnswer !== null) {
+                return $submitResult->correctAnswer;
+            }
+        }
+
+        if ($io->confirm('Do you want to mark this answer as <fg=bright-green;options=bold,underscore>correct</>?', false)) {
+            $this->answerService->saveAsAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+            $io->success('Well done!');
+            return true;
+        }
+
+        if ($io->confirm('Do you want to mark this answer as <fg=red;options=bold,underscore>incorrect</>?', false)) {
+            $this->answerService->saveAsWrongAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+            $io->warning('Too bad, better luck next time!');
+            return false;
+        }
+
+        return true; // Don't know if this was the correct answer, but just continue with the next puzzle
+    }
+
+    private function shouldSubmit(InputInterface $input, SymfonyStyle $io): bool
+    {
+        $option = $input->getOption(self::OPTION_SUBMIT);
+        if ($option !== null) {
+            return $option;
+        }
+
+        return $io->confirm('Do you want me to submit this answer to Advent of Code for you?');
     }
 
     private function formatAnswer(string|int $answer): string
