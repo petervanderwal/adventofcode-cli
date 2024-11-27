@@ -163,7 +163,8 @@ class RunCommand extends Command
 
         $io->caution(
             sprintf(
-                'Test failed, expected answer was: %s but got answer: %s',
+                'The test "%s" failed, expected answer was: %s but got answer: %s',
+                $demoInput->name,
                 $this->formatAnswer($demoInput->expectedAnswer),
                 $this->formatAnswer($actualAnswer),
             )
