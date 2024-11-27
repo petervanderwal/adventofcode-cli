@@ -81,6 +81,20 @@ class AnswerService
         return $submissionResult;
     }
 
+    /**
+     * @return bool|null True = answered correctly, false = wrong answer submitted, null = unknown
+     */
+    public function getAnswerStatus(int $year, int $day, int $part): ?bool
+    {
+        if ($this->fixtureService->fixtureExists($this->getAnswerFixturePath($year, $day, $part))) {
+            return true;
+        }
+        if ($this->fixtureService->fixtureExists($this->getFailureFixturePath($year, $day, $part))) {
+            return false;
+        }
+        return null;
+    }
+
     private function getAnswerFixturePath(int $year, int $day, int $part): string
     {
         return sprintf('%d/%d/answer-%d.txt', $year, $day, $part);

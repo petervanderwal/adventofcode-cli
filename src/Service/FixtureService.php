@@ -28,6 +28,11 @@ class FixtureService
         );
     }
 
+    public function fixtureExists(string $path): bool
+    {
+        return is_file($this->getFullFilename($path));
+    }
+
     public function getFixture(string $path): ?string
     {
         $filename = $this->getFullFilename($path);

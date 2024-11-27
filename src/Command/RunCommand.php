@@ -24,6 +24,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 #[AsCommand('aoc:run')]
 class RunCommand extends Command
 {
+    use ListPuzzlesTrait;
+
     public const ENVIRONMENT_VARIABLE_AUTO_SUBMIT = 'ADVENT_OF_CODE_AUTO_SUBMIT';
 
     public const ARGUMENT_YEAR = 'year';
@@ -91,6 +93,8 @@ class RunCommand extends Command
         foreach ($puzzles as $puzzle) {
             $success = $this->runPuzzle($puzzle, $input, $io) || $success;
         }
+
+        $this->listPuzzles($io, 'Puzzle summary', $this->answerService, ...$puzzles);
 
         return $success ? self::SUCCESS : self::FAILURE;
     }
