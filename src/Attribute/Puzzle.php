@@ -14,7 +14,7 @@ class Puzzle
         public readonly int $day,
         public readonly int $part,
     ) {
-        if ($this->year < self::FIRST_PUZZLE_YEAR || $this->year >= date('Y')) {
+        if ($this->year < self::FIRST_PUZZLE_YEAR || $this->year > date('Y')) {
             throw new \InvalidArgumentException('Year should be >= ' . self::FIRST_PUZZLE_YEAR . ' and <= ' . date('Y'));
         }
         if ($this->day < 1 || $this->day > 25) {
