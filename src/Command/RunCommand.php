@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace PeterVanDerWal\AdventOfCode\Cli\Command;
 
 use PeterVanDerWal\AdventOfCode\Cli\Attribute\TestWithDemoInput;
+use PeterVanDerWal\AdventOfCode\Cli\Exception\AdventOfCodeNotAuthorizedException;
 use PeterVanDerWal\AdventOfCode\Cli\Exception\PuzzleInputNotFoundException;
+use PeterVanDerWal\AdventOfCode\Cli\Exception\PuzzleInputNotYetAvailableException;
 use PeterVanDerWal\AdventOfCode\Cli\Model\PuzzleImplementation;
 use PeterVanDerWal\AdventOfCode\Cli\Repository\PuzzleRepository;
+use PeterVanDerWal\AdventOfCode\Cli\Service\AdventOfCodeHttpService;
 use PeterVanDerWal\AdventOfCode\Cli\Service\AnswerService;
 use PeterVanDerWal\AdventOfCode\Cli\Service\PuzzleInputService;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -38,6 +41,7 @@ class RunCommand extends Command
         private readonly PuzzleRepository $puzzleRepository,
         private readonly PuzzleInputService $puzzleInputService,
         private readonly AnswerService $answerService,
+        private readonly AdventOfCodeHttpService $httpService,
     ) {
         parent::__construct();
     }
@@ -172,11 +176,17 @@ class RunCommand extends Command
 
         try {
             $puzzleInput = $this->puzzleInputService->getPuzzleInput($puzzle->year, $puzzle->day);
+        } catch (AdventOfCodeNotAuthorizedException) {
+            $io->error('Authorization expired, please ' . AuthorizeCommand::CONFIGURE_INSTRUCTIONS);
+            return false;
+        } catch (PuzzleInputNotYetAvailableException) {
+            $io->error('Puzzle ' . $puzzle->getName() . ' is not available yet');
+            return false;
         } catch (PuzzleInputNotFoundException $exception) {
             $io->error(sprintf(
-                'Puzzle input not found, please store it as "%s" manually or configure your Advent of Code session id as described in %s',
+                "Puzzle input not found, please store it as \n    %s\n manually or %s",
                 $exception->fixturePath,
-                'TODO' // TODO add md file with instructions
+                AuthorizeCommand::CONFIGURE_INSTRUCTIONS,
             ));
             return false;
         }
@@ -196,13 +206,17 @@ class RunCommand extends Command
         }
 
         if ($this->shouldSubmit($input, $io)) {
-            $submitResult = $this->answerService->submitAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
-            $io->{$submitResult->correctAnswer ? 'success' : 'error'}(
-                "Advent of Code said:\n\n".
-                $submitResult->adventOfCodeResponse
-            );
-            if ($submitResult->correctAnswer !== null) {
-                return $submitResult->correctAnswer;
+            try {
+                $submitResult = $this->answerService->submitAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+                $io->{$submitResult->correctAnswer ? 'success' : 'error'}(
+                    "Advent of Code said:\n\n".
+                    $submitResult->adventOfCodeResponse
+                );
+                if ($submitResult->correctAnswer !== null) {
+                    return $submitResult->correctAnswer;
+                }
+            } catch (AdventOfCodeNotAuthorizedException) {
+                $io->error('Authorization expired, please ' . AuthorizeCommand::CONFIGURE_INSTRUCTIONS);
             }
         }
 
@@ -226,6 +240,10 @@ class RunCommand extends Command
         $option = $input->getOption(self::OPTION_SUBMIT);
         if ($option !== null) {
             return $option;
+        }
+        if (!$this->httpService->isAuthenticated()) {
+            $io->note('We can auto submit your answer if you want, ' . AuthorizeCommand::CONFIGURE_INSTRUCTIONS);
+            return false;
         }
 
         return $io->confirm('Do you want me to submit this answer to Advent of Code for you?');

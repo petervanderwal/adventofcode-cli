@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PeterVanDerWal\AdventOfCode\Cli\Service;
 
+use PeterVanDerWal\AdventOfCode\Cli\Exception\AdventOfCodeNotAuthorizedException;
 use PeterVanDerWal\AdventOfCode\Cli\Model\AnswerSubmissionResult;
 
 class AnswerService
@@ -62,6 +63,9 @@ class AnswerService
         );
     }
 
+    /**
+     * @throws AdventOfCodeNotAuthorizedException
+     */
     public function submitAnswer(int $year, int $day, int $part, int|string $answer): AnswerSubmissionResult
     {
         $submissionResult = new AnswerSubmissionResult(

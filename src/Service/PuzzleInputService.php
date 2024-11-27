@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PeterVanDerWal\AdventOfCode\Cli\Service;
 
+use PeterVanDerWal\AdventOfCode\Cli\Exception\AdventOfCodeNotAuthorizedException;
 use PeterVanDerWal\AdventOfCode\Cli\Exception\PuzzleInputNotFoundException;
+use PeterVanDerWal\AdventOfCode\Cli\Exception\PuzzleInputNotYetAvailableException;
 
 /**
  * @internal
@@ -18,6 +20,8 @@ class PuzzleInputService
     }
 
     /**
+     * @throws AdventOfCodeNotAuthorizedException
+     * @throws PuzzleInputNotYetAvailableException
      * @throws PuzzleInputNotFoundException
      */
     public function getPuzzleInput(int $year, int $day): string
