@@ -43,8 +43,7 @@ class Day01
     // Same as the classname, the name of the method itself doesn't matter
     public function part1(PuzzleInput $input): int|string
     {
-        // The method should accept one single argument of the type PuzzleInput.  and contains some extra information
-        // about the input (whether it is a demo input or full input) that can be helpful during debugging.
+        // The method should accept one single argument of the type PuzzleInput.
         
         // The PuzzleInput object is of the type UnicodeString provided by
         // Symfony (https://symfony.com/doc/current/string.html#usage), supporting operations such as:
