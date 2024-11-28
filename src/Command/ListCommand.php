@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand('aoc:list')]
+#[AsCommand('aoc:list', description: 'Lists all puzzle implementations within this project.')]
 class ListCommand extends Command
 {
     use ListPuzzlesTrait;

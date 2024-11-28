@@ -21,7 +21,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
-#[AsCommand('aoc:run')]
+#[AsCommand('aoc:run', description: 'Run a puzzle implementation. When no arguments are provided it will run the last puzzle in your set. Provide arguments to run a specific or a list of multiple puzzle implementations.')]
 class RunCommand extends Command
 {
     use ListPuzzlesTrait;

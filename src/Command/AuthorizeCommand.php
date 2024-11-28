@@ -13,7 +13,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
-#[AsCommand('aoc:auth')]
+#[AsCommand('aoc:auth', description: 'Authorizes the CLI bundle to access your Advent of Code account to be able to retrieve your puzzle input and submit your answers.')]
 class AuthorizeCommand extends Command
 {
     public const CONFIGURE_INSTRUCTIONS = "(re)configure your Advent of Code session id with\n    bin/console aoc:auth";
