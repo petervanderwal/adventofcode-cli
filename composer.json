@@ -2,6 +2,7 @@
   "name": "petervanderwal/adventofcode-cli",
   "type": "symfony-bundle",
   "license": "MIT",
+  "description": "A Symfony bundle that helps to create puzzle implementations for Advent of Code",
   "require": {
     "php": ">=8.1",
     "nette/safe": "^0.9.0",
