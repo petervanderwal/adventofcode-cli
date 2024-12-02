@@ -54,12 +54,40 @@ class PuzzleRepository
         return array_values($this->puzzles);
     }
 
-    public function filter(?int $year = null, ?int $day = null, ?int $part = null): array
+    /**
+     * @return PuzzleImplementation[]
+     */
+    public function filterYear(?int $year = null, ?int $day = null, ?int $part = null): array
     {
         return array_filter(
             $this->list(),
             fn (PuzzleImplementation $puzzle): bool =>
                 ($year === null || $puzzle->year === $year)
+                && ($day === null || $puzzle->day === $day)
+                && ($part === null || $puzzle->part === $part)
+        );
+    }
+
+    /**
+     * @return PuzzleImplementation[]
+     */
+    public function filterPath(string $path, ?int $day = null, ?int $part = null): array
+    {
+        if (is_file($path)) {
+            $fileCondition = fn(string $file): bool => $file === $path;
+        } elseif (is_dir($path)) {
+            $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+            $fileCondition = fn(string $file): bool => str_starts_with($file, $path);
+        } else {
+            throw new \InvalidArgumentException('Path not found: ' . $path);
+        }
+
+        return array_filter(
+            $this->list(),
+            fn (PuzzleImplementation $puzzle): bool =>
+                $fileCondition(
+                    (new /* @noinspection */ \ReflectionClass($puzzle->puzzleObject))->getFileName()
+                )
                 && ($day === null || $puzzle->day === $day)
                 && ($part === null || $puzzle->part === $part)
         );

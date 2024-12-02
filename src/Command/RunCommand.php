@@ -28,7 +28,7 @@ class RunCommand extends Command
 
     public const ENVIRONMENT_VARIABLE_AUTO_SUBMIT = 'ADVENT_OF_CODE_AUTO_SUBMIT';
 
-    public const ARGUMENT_YEAR = 'year';
+    public const ARGUMENT_YEAR_PATH = 'year|path';
     public const ARGUMENT_DAY = 'day';
     public const ARGUMENT_PART = 'part';
 
@@ -52,8 +52,8 @@ class RunCommand extends Command
     {
         $this
             ->addArgument(
-                self::ARGUMENT_YEAR,
-                description: 'The year of the puzzle(s) you want to run. Leave blank to run the last puzzle in your set'
+                self::ARGUMENT_YEAR_PATH,
+                description: 'The year of the puzzle(s) you want to run - or the path to the puzzle file(s). Leave blank to run the last puzzle in your set'
             )
             ->addArgument(
                 self::ARGUMENT_DAY,
@@ -99,8 +99,14 @@ class RunCommand extends Command
         return $success ? self::SUCCESS : self::FAILURE;
     }
 
-    private function getIntegerArgument(InputInterface $input, string $argument): ?int
-    {
+    /**
+     * @return ($allowString is true ? int|string|null : int|null)
+     */
+    private function getIntegerArgument(
+        InputInterface $input,
+        string $argument,
+        bool $allowString = false,
+    ): int|string|null {
         $stringValue = $input->getArgument($argument);
         if ($stringValue === '' || $stringValue === null) {
             return null;
@@ -109,6 +115,10 @@ class RunCommand extends Command
         $intValue = (int)$stringValue;
         if ((string)$intValue === $stringValue) {
             return $intValue;
+        }
+
+        if ($allowString) {
+            return $stringValue;
         }
 
         throw new \InvalidArgumentException(
@@ -121,18 +131,25 @@ class RunCommand extends Command
      */
     private function getPuzzles(InputInterface $input): array
     {
-        $year = $this->getIntegerArgument($input, self::ARGUMENT_YEAR);
-        if ($year === null) {
+        $yearPath = $this->getIntegerArgument($input, self::ARGUMENT_YEAR_PATH, true);
+
+        if ($yearPath === null) {
             return $input->getOption(self::OPTION_ALL)
                 ? $this->puzzleRepository->list()
                 : [$this->puzzleRepository->getLastPuzzle()];
         }
 
-        return $this->puzzleRepository->filter(
-            $year,
-            $this->getIntegerArgument($input, self::ARGUMENT_DAY),
-            $this->getIntegerArgument($input, self::ARGUMENT_PART),
-        );
+        $day = $this->getIntegerArgument($input, self::ARGUMENT_DAY);
+        $part = $this->getIntegerArgument($input, self::ARGUMENT_PART);
+        if (is_int($yearPath)) {
+            return $this->puzzleRepository->filterYear($yearPath, $day, $part);
+        }
+
+        $path = realpath($yearPath);
+        if ($path === false) {
+            throw new \InvalidArgumentException('Path not found: ' . $yearPath);
+        }
+        return $this->puzzleRepository->filterPath($path, $day, $part);
     }
 
     private function runPuzzle(PuzzleImplementation $puzzle, InputInterface $input, SymfonyStyle $io): bool
