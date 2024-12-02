@@ -1,0 +1,84 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [ -z "${COMPOSER_RUNTIME_BIN_DIR-}" ]; then
+    echo "Error: Script is expected to be executed via the composer vendor/bin/puzzle-php-bridge" >&2
+    exit 2
+fi
+PROJECT_DIR="$(cd "${COMPOSER_RUNTIME_BIN_DIR}/../../" &>/dev/null && pwd)"
+PROJECT_DIR_LENGTH="${#PROJECT_DIR}"
+
+function isProjectFile() {
+    path="$1"
+    if [ -d "$path" ]; then
+        path="$(cd "$path" &>/dev/null && pwd)"
+    else
+        path="$(cd "$(dirname "$path")" &>/dev/null && pwd)"
+    fi
+
+    path="${path:0:$PROJECT_DIR_LENGTH+1}"
+    if [ "$path" == "$PROJECT_DIR" ] || [ "$path" == "${PROJECT_DIR}/" ]; then
+        return 0
+    fi
+    return 1
+}
+
+php=""
+args=()
+fileProvided=0
+
+for var in "$@"; do
+    case "$var" in
+        ("--help"|"-h")
+            echo "Usage: ${BASH_SOURCE[0]} <file>"
+            echo "   or: ${BASH_SOURCE[0]} -dphp_option=value <file>"
+            echo
+            echo "Pass option"
+            echo "    -daoc.php_binary=/path/to/php"
+            echo "to override the PHP binary"
+            exit
+            ;;
+
+        # PHP binary provided via arguments
+        ("-daoc.php_binary="*)
+            php="${var:17}"
+            ;;
+
+        # Any arguments starting with minus are php options (or other options), just treat as plain option
+        ("-"*)
+            args+=("$var")
+            ;;
+
+        (*)
+            if ! isProjectFile "$var"; then
+                args+=("$var")
+                continue
+            fi
+
+            if (( fileProvided )); then
+                echo "Error: You can only provide one single puzzle file" >&2
+                exit 1
+            fi
+            fileProvided=1
+
+            args+=(
+                # projectDir/vendor/bin/../../bin/console === projectDir/bin/console
+                "${COMPOSER_RUNTIME_BIN_DIR}/../../bin/console"
+                "--ansi"
+                "aoc:run"
+                "$var"
+            )
+            ;;
+    esac
+done
+
+if [ -z "$php" ]; then
+    php="$(which php || true)"
+    if [ -z "$php" ]; then
+        echo "Error: PHP binary not found, provide with option -daoc.php_binary=/path/to/php" >&2
+        exit 2
+    fi
+fi
+
+$php "${args[@]}"

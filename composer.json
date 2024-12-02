@@ -12,6 +12,7 @@
     "symfony/http-kernel": "^6.4",
     "symfony/yaml": "^6.4"
   },
+  "bin": ["bin/puzzle-php-bridge"],
   "config": {
     "allow-plugins": {
       "symfony/flex": true

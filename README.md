@@ -62,6 +62,10 @@ The automatic submission of your solution can be managed with
 ### List all your puzzle solutions
 Run `bin/console aoc:list` to list all your puzzle implementations within your project.
 
+### IDE integration
+To run your puzzle implementation directly from your IDE, the binary `vendor/bin/puzzle-php-bridge` can be used. Read 
+the [IDE configuration instructions](docs/puzzle-php-bridge.md).
+
 ## Credits
 A big shout-out to [Eric Wastl](http://was.tl/) and his team for his dedication on creating [Advent of Code](https://adventofcode.com/)
 for that many years in a row already! Note that Advent of Code was not involved in the development of this bundle and is 
