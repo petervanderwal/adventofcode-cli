@@ -12,7 +12,7 @@ class PuzzleInput extends UnicodeString
         string $string = '',
         public readonly ?string $demoInputName = null,
     ) {
-        parent::__construct($string);
+        parent::__construct(rtrim($string, "\n\r\0"));
     }
 
     public function __sleep(): array
