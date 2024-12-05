@@ -6,6 +6,7 @@ namespace PeterVanDerWal\AdventOfCode\Cli\Command;
 
 use PeterVanDerWal\AdventOfCode\Cli\Model\PuzzleImplementation;
 use PeterVanDerWal\AdventOfCode\Cli\Service\AnswerService;
+use PeterVanDerWal\AdventOfCode\Cli\Service\ExecutionTimeService;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 trait ListPuzzlesTrait
@@ -14,11 +15,12 @@ trait ListPuzzlesTrait
         SymfonyStyle $io,
         string $title,
         AnswerService $answerService,
+        ExecutionTimeService $executionTimeService,
         PuzzleImplementation ...$puzzles
     ): void {
         $table = $io->createTable()
             ->setHeaderTitle($title)
-            ->setHeaders(['Year', 'Day', 'Part', 'Class', 'Method', 'Completed']);
+            ->setHeaders(['Year', 'Day', 'Part', 'Class', 'Method', 'Completed', 'Time needed']);
 
         foreach ($puzzles as $puzzle) {
             $status = match ($answerService->getAnswerStatus($puzzle->year, $puzzle->day, $puzzle->part)) {
@@ -26,6 +28,8 @@ trait ListPuzzlesTrait
                 false => "<fg=red>\xE2\x9D\x8C</>",
                 null => "<fg=blue;options=bold>?</>",
             };
+            $time = $executionTimeService->getExecutionTimeFormatted($puzzle->year, $puzzle->day, $puzzle->part)
+                ?? "<fg=blue;options=bold>?</>";
 
             $table->addRow(
                 [
@@ -35,6 +39,7 @@ trait ListPuzzlesTrait
                     $puzzle->puzzleObject::class,
                     $puzzle->methodName,
                     $status,
+                    $time,
                 ]
             );
         }

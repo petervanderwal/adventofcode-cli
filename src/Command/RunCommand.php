@@ -12,6 +12,7 @@ use PeterVanDerWal\AdventOfCode\Cli\Model\PuzzleImplementation;
 use PeterVanDerWal\AdventOfCode\Cli\Repository\PuzzleRepository;
 use PeterVanDerWal\AdventOfCode\Cli\Service\AdventOfCodeHttpService;
 use PeterVanDerWal\AdventOfCode\Cli\Service\AnswerService;
+use PeterVanDerWal\AdventOfCode\Cli\Service\ExecutionTimeService;
 use PeterVanDerWal\AdventOfCode\Cli\Service\PuzzleInputService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -34,6 +35,10 @@ class RunCommand extends Command
 
     public const OPTION_ALL = 'all';
     public const OPTION_SUBMIT = 'submit';
+    public const OPTION_STORE_EXECUTION_TIME = 'store-execution-time';
+    public const OPTION_VALUE_STORE_EXECUTION_TIME_IF_BETTER = 'if-better';
+    public const OPTION_VALUE_STORE_EXECUTION_TIME_ALWAYS = 'always';
+    public const OPTION_VALUE_STORE_EXECUTION_TIME_NEVER = 'never';
 
     public function __construct(
         #[Autowire('%env(defined:' . self::ENVIRONMENT_VARIABLE_AUTO_SUBMIT . ')%')]
@@ -44,6 +49,7 @@ class RunCommand extends Command
         private readonly PuzzleInputService $puzzleInputService,
         private readonly AnswerService $answerService,
         private readonly AdventOfCodeHttpService $httpService,
+        private readonly ExecutionTimeService $executionTimeService,
     ) {
         parent::__construct();
     }
@@ -76,7 +82,14 @@ class RunCommand extends Command
                     self::ENVIRONMENT_VARIABLE_AUTO_SUBMIT,
                 ),
                 default: $this->autoSubmitDefined ? $this->autoSubmit : null,
-            );
+            )
+            ->addOption(
+                self::OPTION_STORE_EXECUTION_TIME,
+                mode: InputOption::VALUE_REQUIRED,
+                description: 'Store the execution time',
+                default: self::OPTION_VALUE_STORE_EXECUTION_TIME_IF_BETTER,
+            )
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -94,7 +107,7 @@ class RunCommand extends Command
             $success = $this->runPuzzle($puzzle, $input, $io) || $success;
         }
 
-        $this->listPuzzles($io, 'Puzzle summary', $this->answerService, ...$puzzles);
+        $this->listPuzzles($io, 'Puzzle summary', $this->answerService, $this->executionTimeService, ...$puzzles);
 
         return $success ? self::SUCCESS : self::FAILURE;
     }
@@ -172,7 +185,7 @@ class RunCommand extends Command
     ): bool {
         $io->section(sprintf('Running test "%s"', $demoInput->name));
 
-        $actualAnswer = $puzzle->run($demoInput);
+        $actualAnswer = $puzzle->run($demoInput)->answer;
         if ($actualAnswer === $demoInput->expectedAnswer) {
             $io->writeln(sprintf('<fg=green>Test successful, got expected answer: %s</>', $this->formatAnswer($actualAnswer)));
             return true;
@@ -213,11 +226,25 @@ class RunCommand extends Command
             return false;
         }
 
-        $answer = $puzzle->run($puzzleInput);
-        $io->block('Found answer: ' . $answer, style: 'bg=cyan', padding: true);
-        $isCorrectAnswer = $this->answerService->isCorrectAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+        $puzzleResult = $puzzle->run($puzzleInput);
+        $io->block(
+            sprintf(
+                'Found answer: %s in %s',
+                $this->formatAnswer($puzzleResult->answer),
+                $this->executionTimeService->formatTime($puzzleResult->executionTime)
+            ),
+            style: 'bg=cyan',
+            padding: true
+        );
+        $isCorrectAnswer = $this->answerService->isCorrectAnswer(
+            $puzzle->year,
+            $puzzle->day,
+            $puzzle->part,
+            $puzzleResult->answer
+        );
 
         if ($isCorrectAnswer) {
+            $this->storeExecutionTime($input, $puzzle, $puzzleResult->executionTime);
             $io->success('Found the correct answer that was submitted already');
             return true;
         }
@@ -229,13 +256,22 @@ class RunCommand extends Command
 
         if ($this->shouldSubmit($input, $io)) {
             try {
-                $submitResult = $this->answerService->submitAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+                $submitResult = $this->answerService->submitAnswer(
+                    $puzzle->year,
+                    $puzzle->day,
+                    $puzzle->part,
+                    $puzzleResult->answer
+                );
                 $io->{$submitResult->correctAnswer ? 'success' : 'error'}(
                     "Advent of Code said:\n\n".
                     $submitResult->adventOfCodeResponse
                 );
-                if ($submitResult->correctAnswer !== null) {
-                    return $submitResult->correctAnswer;
+
+                if ($submitResult->correctAnswer) {
+                    $this->storeExecutionTime($input, $puzzle, $puzzleResult->executionTime);
+                    return true;
+                } elseif ($submitResult->correctAnswer === false) {
+                    return false;
                 }
             } catch (AdventOfCodeNotAuthorizedException) {
                 $io->error('Authorization expired, please ' . AuthorizeCommand::CONFIGURE_INSTRUCTIONS);
@@ -243,13 +279,14 @@ class RunCommand extends Command
         }
 
         if ($io->confirm('Do you want to mark this answer as <fg=bright-green;options=bold,underscore>correct</>?', false)) {
-            $this->answerService->saveAsAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+            $this->answerService->saveAsAnswer($puzzle->year, $puzzle->day, $puzzle->part, $puzzleResult->answer);
+            $this->storeExecutionTime($input, $puzzle, $puzzleResult->executionTime);
             $io->success('Well done!');
             return true;
         }
 
         if ($io->confirm('Do you want to mark this answer as <fg=red;options=bold,underscore>incorrect</>?', false)) {
-            $this->answerService->saveAsWrongAnswer($puzzle->year, $puzzle->day, $puzzle->part, $answer);
+            $this->answerService->saveAsWrongAnswer($puzzle->year, $puzzle->day, $puzzle->part, $puzzleResult->answer);
             $io->warning('Too bad, better luck next time!');
             return false;
         }
@@ -269,6 +306,37 @@ class RunCommand extends Command
         }
 
         return $io->confirm('Do you want me to submit this answer to Advent of Code for you?');
+    }
+
+    private function storeExecutionTime(InputInterface $input, PuzzleImplementation $puzzle, int $executionTime): void
+    {
+        $option = $input->getOption(self::OPTION_STORE_EXECUTION_TIME);
+        if ($option === self::OPTION_VALUE_STORE_EXECUTION_TIME_NEVER) {
+            return;
+        }
+
+        $options = [
+            self::OPTION_VALUE_STORE_EXECUTION_TIME_IF_BETTER,
+            self::OPTION_VALUE_STORE_EXECUTION_TIME_ALWAYS,
+            self::OPTION_VALUE_STORE_EXECUTION_TIME_NEVER,
+        ];
+        if (!in_array($option, $options)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Wrong option value for %s, available options: "%s"',
+                    self::OPTION_STORE_EXECUTION_TIME,
+                    implode('", "', $options),
+                )
+            );
+        }
+
+        $this->executionTimeService->saveExecutionTime(
+            $puzzle->year,
+            $puzzle->day,
+            $puzzle->part,
+            $executionTime,
+            onlyIfBetter: $option === self::OPTION_VALUE_STORE_EXECUTION_TIME_IF_BETTER,
+        );
     }
 
     private function formatAnswer(string|int $answer): string

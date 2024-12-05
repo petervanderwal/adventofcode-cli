@@ -53,16 +53,21 @@ class PuzzleImplementation
         );
     }
 
-    public function run(TestWithDemoInput|string $input): int|string
+    public function run(TestWithDemoInput|string $input): PuzzleResult
     {
         $puzzleInput = $input instanceof TestWithDemoInput
             ? new PuzzleInput($input->input, demoInputName: $input->name)
             : new PuzzleInput($input);
 
         try {
-            $answer = $this->getMethod()->invoke($this->puzzleObject, $puzzleInput);
+            $method = $this->getMethod();
+
+            $startTime = hrtime(true);
+            $answer = $method->invoke($this->puzzleObject, $puzzleInput);
+            $endTime = hrtime(true);
+
             if (is_string($answer) || is_int($answer)) {
-                return $answer;
+                return new PuzzleResult($answer, $endTime - $startTime);
             }
         } catch (\ReflectionException $exception) {
             throw new \BadMethodCallException(
