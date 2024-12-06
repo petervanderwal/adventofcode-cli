@@ -55,7 +55,16 @@ class ExecutionTimeService
             $executionTime < 1000000000     => sprintf('%.0f ms', $executionTime / 1000000),
             $executionTime < 10000000000    => sprintf('%.2f sec', $executionTime / 1000000000),
             $executionTime < 100000000000   => sprintf('%.1f sec', $executionTime / 1000000000),
-            default                         => sprintf('%.0f sec', $executionTime / 1000000000),
+            default                         => $this->formatSeconds((int)round($executionTime / 1000000000)),
+        };
+    }
+
+    private function formatSeconds(int $seconds): string
+    {
+        return match (true) {
+            $seconds < 60   => sprintf('%d sec', $seconds),
+            $seconds < 3600 => sprintf('%d:%02d min', $seconds / 60, $seconds % 60),
+            default         => sprintf('%d:%02d hour', $seconds / 3600, ($seconds / 60) % 60),
         };
     }
 
