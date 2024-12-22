@@ -21,8 +21,9 @@ class AnswerService
      */
     public function isCorrectAnswer(int $year, int $day, int $part, int|string $answer): ?bool
     {
-        if ((string)$answer === $this->getSubmittedAnswer($year, $day, $part)) {
-            return true;
+        $submittedAnswer = $this->getSubmittedAnswer($year, $day, $part);
+        if ($submittedAnswer !== null) {
+            return (string)$answer === $submittedAnswer;
         }
         if (in_array($answer, $this->getKnownWrongAnswers($year, $day, $part), true)) {
             return false;
